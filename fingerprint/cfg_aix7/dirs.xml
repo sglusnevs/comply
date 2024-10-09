@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition 
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (dirs)">
+		<Component>*</Component>		
+	</System>
+	
+    <!-- !!! Note: 'Depth' attribute will be ignored on SUN systems since '-maxdepth' is not supported by the 'find' command -->
+    <Files Label="WLM Infos" Path="/etc/wlm"/>
+</ScanDefs>
+

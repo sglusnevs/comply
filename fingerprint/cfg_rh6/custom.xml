@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions">	
+	</System>
+	<IncludeDefinition href="redhat-release.xml"/>
+	<IncludeDefinition href="repos.xml"/>
+</ScanDefs>
+

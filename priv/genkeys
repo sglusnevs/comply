@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# How long certificate with public key is valid
+CERT_VALIDITY_DAYS=365
+
+# Generate an RSA keypair, valid for 365 days, 4096 bits long
+CERT_REQ_DIR=../fingerprint/keys/
+
+if [ ! -d "$CERT_REQ_DIR" ]; then
+    echo "ERROR: output directory $CERT_REQ_DIR does not exist."
+    exit 1
+fi
+
+CERT_REQ_FILE=comply.crt
+CERT_REQ="$CERT_REQ_DIR$CERT_REQ_FILE"
+PRIVKEY_OUT=comply.key
+
+openssl req -nodes -x509 -sha256 -newkey rsa:4096 -keyout $PRIVKEY_OUT -out $CERT_REQ -pubkey -days $CERT_VALIDITY_DAYS -subj "/DC=EU/DC=unicreditgroup/OU=IT Dept/CN=comply Sign Key" || echo "ERROR trying to run openssl"
+
+echo 
+echo "SUCCESS"
+echo 
+echo "Privete key '$PRIVKEY_OUT' is generated"
+echo "Certificate with public key '$CERT_REQ' is generated"

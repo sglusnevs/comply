@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition 
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (INI-Datei mit ElementDelimiter)">
+		<Component>*</Component>		
+	</System>
+	
+	<ConfigData Label="INI config" Location="/etc/nsswitch.conf" Type="INI" ElementDelimiter=":"/>
+</ScanDefs>
+

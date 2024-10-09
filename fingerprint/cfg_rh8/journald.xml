@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (WININI-Datei mit ElementDelimiter)">
+		<Component>*</Component>		
+	</System>
+	
+	<ConfigData Label="journald config" Location="/etc/systemd/journald.conf" Type="WININI" ElementDelimiter="="/>
+</ScanDefs>
+

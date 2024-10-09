@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition 
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions">	
+	</System>
+	<IncludeDefinition href="txt_data.xml"/>
+	<IncludeDefinition href="nscontrol.xml"/>
+	<IncludeDefinition href="xml_data.xml"/>
+	<IncludeDefinition href="dirs.xml"/>
+</ScanDefs>
+

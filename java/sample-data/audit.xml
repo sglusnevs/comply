@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PLMon Version="3.0.0" M="Release" C="P.Liebl" xmlns:complysh="plmon.security.policydefinition">
+    <Creation PID="X" Computer="puppet" User="root" Date="2022-02-15+01:00" Time="12:46:50+01:00" />
+    <System Version="2.0" Label="CentOS Linux release 8.1.1911 (Core)" SystemName="puppet">
+    </System>
+    <ConfigData complysh:module="banners" Label="/etc/issue Banner Config" Location="/etc/issue" Type="TXT">
+      <Line><![CDATA[S]]></Line>
+      <Line><![CDATA[Kernel r on an m]]></Line>
+      <Line><![CDATA[]]></Line>
+    </ConfigData>
+    <ConfigData complysh:module="banners" Label="/etc/issue.net Banner Config" Location="/etc/issue.net" Type="TXT">
+      <Line><![CDATA[S]]></Line>
+      <Line><![CDATA[Kernel r on an m]]></Line>
+    </ConfigData>
+    <ConfigData complysh:module="banners" Label="/etc/motd Banner Config" Location="/etc/motd" Type="TXT">
+      <Line><![CDATA[Hello, this is a Message of the Day!]]></Line>
+    </ConfigData>
+</PLMon>

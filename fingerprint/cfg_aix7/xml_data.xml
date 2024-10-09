@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (XML)">
+		<Component>*</Component>		
+	</System>
+	
+	<ConfigData Label="xml config" Location="/etc/security/artex/samples/authentProfile.xml" Type="XML"/>
+</ScanDefs>
+

@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+#
+#
+
+# Function to print to STDERR
+function echo_stderr(){ 
+    >&2 echo "$@" 
+}
+
+# Funtion to show usage on invalid command arguments or '-?'
+function print_usage_exit() {
+    echo_stderr 'Usage: '`basename $0` '-in <input-file> -out <output-file> -priv <private-key> -hash <hash-key> -key <encrypted-key>'
+    echo_stderr 'Options:'
+    echo_stderr '-in    --  input file (like audit.enc)'
+    echo_stderr '-out   --  output file (like audit.xml)'
+    echo_stderr '-priv  --  private key from keypair'
+    echo_stderr '-hash  --  file with sha1 digest of unencrypted input file'
+    echo_stderr '-key   --  one-time symmetric key encrypted with public key from keypair'
+    echo_stderr ''
+    echo_stderr 'Example: '`basename $0` "-in audit.enc -out audit.xml -priv comply.key -hash audit.sha1 -key key.enc"
+    exit 1
+}
+
+# Parse command-line options
+while (( "$#" )); do
+    case $1 in
+        -in)
+            shift
+            IN_FILE="$1"
+        ;;
+        -out)
+            shift
+            OUT_FILE="$1"
+        ;;
+        -priv)
+            shift
+            KEY_PRIV="$1"
+        ;;
+        -hash)
+            shift
+            DIGEST="$1"
+        ;;
+        -key)
+            shift
+            KEY_SYM_ONETIME_ENC="$1"
+        ;;
+        -?|--help)
+            print_usage_exit
+        ;;
+        *)
+            shift
+        ;;
+    esac
+done
+
+KEY_SYM_ONETIME_DEC=key.bin
+
+PARAMS_ALL="IN_FILE KEY_PRIV DIGEST KEY_SYM_ONETIME_ENC"
+
+for K in $PARAMS_ALL; do
+    VAR_VALUE=${!K}
+    if [ -z "$VAR_VALUE" ]; then
+        print_usage_exit
+    fi
+
+    if [ ! -f "$VAR_VALUE" ]; then
+        echo "Input file '$VAR_VALUE' not found or not readable"
+        exit
+    fi
+done
+
+# check if output file parameter is set 
+if [ -z "$OUT_FILE" ]; then
+        print_usage_exit
+fi
+
+rm -f ./"$OUT_FILE"
+
+echo "Decrypting one-time key with our private key..."
+
+openssl rsautl -decrypt -inkey $KEY_PRIV -in $KEY_SYM_ONETIME_ENC -out $KEY_SYM_ONETIME_DEC -oaep
+
+echo "Decrypting audit results with one-time key..."
+
+openssl enc -d -aes-256-cbc -md sha256 -in $IN_FILE -pass file:$KEY_SYM_ONETIME_DEC -base64 -a -A | gzip -d > "$OUT_FILE"
+
+echo "Checking checksum..."
+
+CHECKSUM_ORIGINAL=`openssl dgst -sha1 $OUT_FILE | awk -F'= ' '{print $2}'`
+CHECKSUM_NOW=`cat $DIGEST | awk -F'= ' '{print $2}'`
+
+echo "Original checksum: $CHECKSUM_ORIGINAL"
+echo "Checksum on destination: $CHECKSUM_NOW"
+
+IFS='=' COD=($CHECKSUM_ORIGINAL)
+IFS='=' CON=($CHECKSUM_NOW)
+
+if [ "$COD" = "$CON" ]; then
+    echo "SUCCESS: Checksums match!"
+else
+    echo "ERROR: Checksums DO NOT match: '$COD' != '$CON'"
+    exit 1
+fi
+
+rm ./"$KEY_SYM_ONETIME_DEC"
+
+echo -e "\nWriting decrypted result:"
+ls -l $OUT_FILE

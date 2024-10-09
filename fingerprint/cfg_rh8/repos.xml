@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition 
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (dirs)">
+		<Component>*</Component>		
+	</System>
+	
+    <Files Label="DNF Repos" Path="/etc/dnf" Depth="-1"/>
+</ScanDefs>
+

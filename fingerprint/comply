@@ -1,0 +1,356 @@
+#!/usr/bin/env bash
+#
+#
+
+# Location of public file to encrypt the results
+KEY_PUB=./keys/comply.crt
+
+# Own executable
+COMPLY_EXEC="$0"
+
+#####################################################################################
+#                                                                                   #
+# Nothing should be changed below this line                                         #
+#                                                                                   #
+#####################################################################################
+
+# Program Version
+export VERSION=3.12.0
+
+# Release type (Debug|Release)
+export RTYPE=Release
+
+# Default loglevel
+export LOGLEVEL='WARN'
+
+# Add "complysh:module" tag to output
+export MODTRACE=
+
+# Length of one-time random key, bytes
+KEY_SYM_ONETIME_LEN=64
+
+
+# Load functions used by this script and cfg_<system> snippets
+source incl/functions.sh
+
+#
+# Add starting timestamp
+#
+echo_log 'INFO' "Execution started"
+
+#
+# Detect UNIX flavor and its major version
+#
+ROS=`exec_cmd uname -s`
+
+case $ROS in
+    AIX)
+        FVERSION=`exec_cmd uname -a`
+        RVERSION=`exec_cmd echo $FVERSION |awk '{print $4}'`
+        test "$RVERSION" == 7 || echo_log 'FATAL' "Unsupported AIX version: $RVERSION"
+        CFG_PATH=./cfg_aix$RVERSION
+        IST_PATH=./ist_aix$RVERSION
+        TZ_FORMAT='%z'
+        HDR_OS_NAME=`uname -s`
+        HDR_OS_VERSION=`uname -V | cut -d' ' -f2-`
+        HDR_TIME_ACT_ZONE=`date +%Z`
+        HDR_TIME_ACT_OS=`date +%T`
+        HDR_TIME_ACT_GMT=`date -u`
+    ;;
+    Linux)
+        # Positional extraction with awk does not work with RHEL Beta; cut off the first number occured with sed
+        FVERSION=`exec_cmd cat /etc/redhat-release`
+        RVERSION=`exec_cmd echo $FVERSION | sed -n 's/^.* \([0-9]\)\..*/\1/p'`
+        test "$RVERSION" == 6 -o "$RVERSION" == 7 -o "$RVERSION" == 8 || echo_log 'FATAL' "Unsupported Linux version: $RVERSION"
+        CFG_PATH=./cfg_rh$RVERSION
+        IST_PATH=./ist_rh$RVERSION
+        TZ_FORMAT='%:z'
+        HDR_OS_NAME=`grep '^NAME=' /etc/os-release | cut -d= -f2- | sed -e 's/"//g'`
+        HDR_OS_VERSION=`cat /etc/redhat-release | sed -e 's/^.\+ \([.0-9]\+\) .\+/\1/'`
+        HDR_TIME_ACT_ZONE=`date +%Z`
+        HDR_TIME_ACT_OS=`date +%FT%T`
+        HDR_TIME_ACT_GMT=`date -u +%FT%T`
+    ;;
+    SunOS)
+        FVERSION=`exec_cmd uname -a`
+        RVERSION=`exec_cmd echo $FVERSION |awk '{print $3}' |awk -F"." '{print $2}'`
+        test "$RVERSION" == 10 -o "$RVERSION" == 11 || echo_log 'FATAL' "Unsupported SunOS version: $RVERSION"
+        CFG_PATH=./cfg_sun$RVERSION
+        IST_PATH=./ist_sun$RVERSION
+        TZ_FORMAT='%z'
+        HDR_OS_NAME=`uname -s`
+        HDR_OS_VERSION=`uname -r`
+        HDR_TIME_ACT_ZONE=`date +%Z`
+        HDR_TIME_ACT_OS=`date +%T`
+        HDR_TIME_ACT_GMT=`date -u`
+    ;;
+    *)
+        echo_log 'FATAL' "Unknown OS detected: $RVERSION"
+    ;;
+esac
+
+
+# 
+# Where modules common to all UNIX flavors are stored
+#
+export CFG_COMMON=./cfg_common
+
+echo_log 'INFO' "OS Detected: $ROS v$RVERSION"
+
+#
+# List modules from common and OS-specific folders
+#
+MODULES_LIST_ALL=`find $CFG_COMMON $CFG_PATH -name \*.sh | xargs -I{} basename {} | sort | sed -e 's/[.0-9]?\.sh$//'`
+MODULES_LIST_SYSTEM=`find $CFG_COMMON $CFG_PATH -name \*.1.sh | xargs -I{} basename {} | sort | sed -e 's/\.sh$//'`
+MODULES_LIST_REST=`find $CFG_COMMON $CFG_PATH -name \*.sh | xargs -I{} basename {} | grep -v '.1.sh' | sort | sed -e 's/\.sh$//'`
+
+# Name of one-time key to encrypt the results
+KEY_SYM_ONETIME=$IST_PATH/key.bin
+
+# Funtion to show usage on invalid command arguments or '-?'
+function print_usage_exit() {
+    echo_stderr "Fingerpint Software Version $VERSION"
+    echo_stderr 'Usage: '`basename $COMPLY_EXEC` '[ -v | -vv ] [ -p ] [ -m <module> ]'
+    echo_stderr 'Options:'
+    echo_stderr '-v             info mode'
+    echo_stderr '-vv            debug mode'
+    echo_stderr '-p             do not encrypt resulting audit.xml'
+    echo_stderr_nonl '-m  <module>   run single module from this list: '
+    for M in $MODULES_LIST_ALL; do
+        MF=`basename $M '.sh'`
+        echo_stderr_nonl "$MF "
+    done
+    echo_stderr ""
+    exit 1
+}
+
+# Run all modules by default
+export MODULE=ALL
+
+# Whether to preserve unencrypted audit.xml
+PRESERVE_CLEAR=0
+
+# Adjust loglevel if command line parameters are set
+while (( "$#" )); do
+    case $1 in
+        -v)
+            LOGLEVEL='INFO'
+            MODTRACE=1
+            shift
+        ;;
+        -vv)
+            LOGLEVEL='DEBUG'
+            MODTRACE=1
+            shift
+        ;;
+        -vvv)
+            LOGLEVEL='ALL'
+            MODTRACE=1
+            shift
+        ;;
+        -m)
+            shift
+            MODULE="$1"
+            if [ -z "$MODULE" -o \( ! -f "$CFG_COMMON/$MODULE.sh" -a ! -f "$CFG_PATH/$MODULE.sh" \) ]; then
+                print_usage_exit
+            fi
+            break
+        ;;
+        -p)
+            shift
+            PRESERVE_CLEAR=1
+        ;;
+        -?|--help|*)
+            print_usage_exit
+        ;;
+    esac
+    OPTS_IDX=$((OPTS_IDX+1))
+done
+
+echo_log 'DEBUG' "Loglevel '$LOGLEVEL', module '$MODULE'"
+
+# make sure utility functions have execution bit set, while configuration files do not
+chmod +x incl/*.sh
+chmod +x $CFG_PATH/*.sh
+chmod +x $CFG_COMMON/*.sh
+chmod -x $CFG_PATH/*.cfg
+
+# Check we have configuration folder exists
+test -d "$CFG_PATH" || echo_log 'FATAL' "Configuration folder not found: $CFG_PATH"
+
+
+# Check we are root
+if [ "$ROS" = "SunOS" ]; then
+    CMD_ID=/usr/xpg4/bin/id
+else
+    CMD_ID=/usr/bin/id
+fi
+
+CUR_UID=`exec_cmd $CMD_ID -u`
+
+if [ $CUR_UID != "0" ]; then
+    echo_log 'FATAL' "You must be root to run this script"
+fi
+
+# Check key
+if [ ! -f "$KEY_PUB" ]; then
+    >&2 echo "Public key $KEY_PUB does not exist or is not readable. Generate keys with genkeys.sh first."
+    exit 1
+fi
+
+# Check output folder is there, otherwise create
+rm -rf ./"$IST_PATH" && echo_log 'INFO' "Stale 'IST' folder deleted"
+
+mkdir $IST_PATH && echo_log 'INFO' "'IST' folder created"
+
+export IST_PATH CFG_PATH
+
+export CERT_PATH=$IST_PATH/certs
+
+mkdir $CERT_PATH && echo_log 'INFO' "'CERTS' folder created"
+
+
+export HOSTNAME=`exec_cmd hostname`
+export HOSTNAME_SHORT=`exec_cmd hostname | cut -d"." -f1` # solaris does not have -s switch
+export DATE_CURRENT=`exec_cmd date +"%F$TZ_FORMAT"`
+export TIME_CURRENT=`exec_cmd date +"%T$TZ_FORMAT"`
+export TIME_CURRENT_COMPACT=`exec_cmd date +"%Y-%m-%d-%H%M%S"`
+export IFS_ORIG="$IFS"
+
+export CERT_LIST=$CERT_PATH/certs.txt
+
+export DEST_FILE=$IST_PATH/audit-${HOSTNAME}-${TIME_CURRENT_COMPACT}.xml
+export DEST_FILE_ENC=$IST_PATH/audit-${HOSTNAME}-${TIME_CURRENT_COMPACT}.enc
+export DEST_FILE_ENC_XML=$IST_PATH/audit-${HOSTNAME}-${TIME_CURRENT_COMPACT}_enc.xml
+export DEST_FILE_HASH=$IST_PATH/audit-${HOSTNAME}-${TIME_CURRENT_COMPACT}.sha1
+
+# Name of one-time key encrypted with comply public key
+export KEY_SYM_ONETIME_ENC=$IST_PATH/audit-${HOSTNAME}-${TIME_CURRENT_COMPACT}-key.enc
+
+
+export DEST_ARCHIVE=${HOSTNAME}.tgz
+if [ -f "$DEST_ARCHIVE" ]; then
+    rm ./"$DEST_ARCHIVE"
+    echo_log 'INFO' "Existing archive file $DEST_ARCHIVE found and erased"
+fi
+
+# check if OpenSSL is installed
+OPENSSL_VER=`openssl version 2>/dev/null`
+if [ "0" = "$PRESERVE_CLEAR" -a ! "$OPENSSL_VER" ]; then
+    >&2 echo "ERROR: OpenSSL not installed. Use '$COMPLY_EXEC -p' for not-encrypted audit.xml file"
+    exit 1
+fi
+
+
+#
+# Prepare XML document structure
+#
+cat >> "$DEST_FILE" <<EOHEADER
+<?xml version="1.0" encoding="UTF-8"?>
+<PLMon Version="$VERSION" M="$RTYPE" C="P.Liebl" xmlns:complysh="plmon.security.policydefinition">
+    <Creation PID="X" Computer="$HOSTNAME_SHORT" User="$USER" Date="$DATE_CURRENT" Time="$TIME_CURRENT" />
+    <System Version="2.0" Label="$FVERSION" SystemName="$HOSTNAME_SHORT">
+        <OSVersion>
+            <OS>
+                <Name>$HDR_OS_NAME</Name>
+                <Version>$HDR_OS_VERSION</Version>
+                <Locale>$LANG</Locale>
+            </OS>
+        </OSVersion>
+        <Time>
+            <GMT>$HDR_TIME_ACT_GMT</GMT>
+            <OS>$HDR_TIME_ACT_OS</OS>
+            <ActZone>$HDR_TIME_ACT_ZONE</ActZone>
+        </Time>
+EOHEADER
+if  [[ "$MODULE" =~ \.1$ ]]; then
+    echo_log 'DEBUG' "Execute single module from System section: '$MODULE'"
+    exec_module $MODULE >> "$DEST_FILE"
+elif [[ "$MODULE" = 'ALL' ]]; then
+    echo_log 'DEBUG' "Execute all modules from System section"
+	# WARNING!!! These indents are TABs, NOT spaces! Otherwise indented heredoc won't work
+	cat <<-EOBODY >> "$DEST_FILE"
+        $(for M in $MODULES_LIST_SYSTEM; do IFS="$IFS_ORIG" exec_module $M; done)
+	EOBODY
+fi
+cat >> "$DEST_FILE" <<EOSYSTEM
+    </System>
+EOSYSTEM
+if [[ "$MODULE" != 'ALL' ]]; then
+    if [[ ! "$MODULE" =~ \.1$ ]]; then
+        echo_log 'DEBUG' "Execute single module from Non-system section: '$MODULE'"
+        exec_module $MODULE >> "$DEST_FILE"
+    fi
+else
+    echo_log 'DEBUG' "Execute all modules from Non-system section"
+	# WARNING!!! These indents are TABs, NOT spaces! Otherwise indented heredoc won't work
+	cat <<-EOBODY >> "$DEST_FILE"
+        $(for M in $MODULES_LIST_REST; do IFS="$IFS_ORIG" exec_module $M; done)
+	EOBODY
+fi
+cat >> "$DEST_FILE" <<EOFOOTER
+</PLMon>
+EOFOOTER
+
+
+# remove original audit results before sending
+if [ "0" = "$PRESERVE_CLEAR" ]; then
+
+    # generate one-time random key
+    openssl rand $KEY_SYM_ONETIME_LEN > $KEY_SYM_ONETIME
+
+    # generate digest
+    openssl dgst -sha1 $DEST_FILE > $DEST_FILE_HASH
+
+    # Skip the '<?xml' opening tag from the dest file and save resulting data in output file; supress warnings regarding key derivation since it is not supported by Java anyway
+    tail -n +2 "$DEST_FILE" | gzip -c | openssl enc -aes-256-cbc -md sha256 -out $DEST_FILE_ENC -pass file:$KEY_SYM_ONETIME -a -A 2>&1 | grep -v 'deprecated key derivation used' | grep -v 'Using -iter or -pbkdf2 would be better'
+
+    # encrypt random key with public key from certificate
+    openssl rsautl -encrypt -inkey $KEY_PUB -pubin -in $KEY_SYM_ONETIME -out $KEY_SYM_ONETIME_ENC -oaep
+    
+    # encode encrypted key in base 64 for new format XML document
+    KEY_SYM_ONETIME_ENC_BASE64=`cat $KEY_SYM_ONETIME_ENC | openssl base64 -A`
+
+    # get sha256 hash encoded base 64 for new format XML document -- get last line, supress opening '(stdin)= ' prefix
+    KEY_PUB_SHA256_BASE64=`openssl rsa -in $KEY_PUB -pubin -outform der | openssl dgst -sha256 | awk '{print $2}'`
+
+    # output new XML format header
+    
+    echo '<?xml version="1.0" encoding="UTF-8"?>'  > $DEST_FILE_ENC_XML
+
+    echo '<_encElement Cipher="RSA/ECB/OAEPWithSHA1AndMGF1Padding" Format="openssl" SHA256="'"$KEY_PUB_SHA256_BASE64"'">' >> $DEST_FILE_ENC_XML
+
+    echo '<_encKey Cipher="AES/CBC/PKCS5Padding" Encoded="'"$KEY_SYM_ONETIME_ENC_BASE64"'"/>' >> $DEST_FILE_ENC_XML
+
+    echo -n '<_encData>' >> $DEST_FILE_ENC_XML
+
+    cat "$DEST_FILE_ENC" >> $DEST_FILE_ENC_XML
+
+    echo '</_encData>' >> $DEST_FILE_ENC_XML
+
+    echo '</_encElement>' >> $DEST_FILE_ENC_XML
+
+
+    # final clean-ups
+    command -v shred >/dev/null && shred $DEST_FILE
+    rm $DEST_FILE
+
+    # remove unencrypted one-time key
+    command -v shred >/dev/null && shred $KEY_SYM_ONETIME
+
+    rm $KEY_SYM_ONETIME
+fi
+
+
+# pack results
+/bin/tar -cf - $COMPLY_EXEC ./$IST_PATH ./$CFG_COMMON ./$CFG_PATH | gzip -c > $DEST_ARCHIVE
+
+# give some information to the user
+echo "Success: $DEST_ARCHIVE"
+
+#
+# Add finishing timestamp
+#
+echo_log 'INFO' "Execution finished"
+
+exit 0

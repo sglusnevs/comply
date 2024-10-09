@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition 
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (XML-Datei)">
+		<Component>*</Component>		
+	</System>
+	
+	<ConfigData Label="Firewalld Zones Config" Location="/etc/firewalld/zones/public.xml" Type="XML"/>
+</ScanDefs>
+

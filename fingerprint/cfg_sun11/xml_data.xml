@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ScanDefs SYSTEM "PLMonConfig.dtd">
+<!--
+	Beispiel - Definition 
+-->
+<ScanDefs>
+	<System Label="Beispiel: Custom-Definitions (XML-Datei)">
+		<Component>*</Component>		
+	</System>
+	
+	<ConfigData Label="XML Data Config" Location="/etc/ssm/hmp/host_profile.xml" Type="XML"/>
+</ScanDefs>
+
