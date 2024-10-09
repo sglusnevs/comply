@@ -1,7 +1,7 @@
 
-## Comply IT security audit'rs toolkit
+## Comply is an IT security auditor's toolkit
 
-Comply is a tool moduler tool that gathers security-related information from various Unix operating systems and packs it into an XML file. This file is then encrypted with auditor's public key to provide iprovacy, integrity and non-repudiation and is transferred to auditor's desktop. The results can be compared with previous audits, as well as specific exerpts can be analyzed for current security state.
+Comply is a tool that gathers security-related information from various Unix operating systems and packs it into an XML file. This file is then encrypted with auditor's public key to provide iprovacy, integrity and non-repudiation and is transferred to auditor's desktop. The results can be compared with previous audits, as well as specific exerpts can be analyzed for current security state.
 
 Supported OS are:
 
@@ -11,6 +11,7 @@ Supported OS are:
 - RHEL 9 (CIS Benchmarks)
 - Sun Solaris 10
 - Sun Solaris 11 
+
 
 
 ## How to use
